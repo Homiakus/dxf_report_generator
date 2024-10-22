@@ -51,10 +51,6 @@ DXF Report Generator is a Python application that processes DXF files in a selec
    pip install ezdxf matplotlib reportlab
    ```
 
-4. **Ensure Availability of the Arial Font**
-
-   - For Windows users, Arial is typically available at `C:\Windows\Fonts\arial.ttf`.
-   - For other operating systems, ensure that the Arial font is available and adjust the path in the code if necessary.
 
 ## Usage
 
