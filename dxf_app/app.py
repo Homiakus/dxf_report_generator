@@ -9,7 +9,8 @@ from core import (
     calculate_total_length,
     calculate_precise_area,
     render_dxf_to_image,
-    parse_filename_metadata
+    parse_filename_metadata,
+    analyze_dxf_artifacts
 )
 from reports import create_pdf_report, create_excel_report
 
@@ -74,6 +75,8 @@ if uploaded_files:
                 area = calculate_precise_area(doc)
                 metadata = parse_filename_metadata(filename)
 
+                warnings = analyze_dxf_artifacts(doc)
+
                 data_item = {
                     'File': filename,
                     'Name': metadata['name'],
@@ -81,7 +84,8 @@ if uploaded_files:
                     'Thickness': metadata['thickness'],
                     'Quantity': metadata['quantity'],
                     'Length': total_length,
-                    'Area': area
+                    'Area': area,
+                    'Warnings': "\n".join(warnings) if warnings else "OK"
                 }
                 st.session_state['data'].append(data_item)
 
@@ -117,23 +121,46 @@ if uploaded_files:
 # Display UI if reports are generated
 if st.session_state.get('reports_generated'):
 
-    # If the user updated the cost multipliers, regenerate the reports to keep them in sync
-    if recalculate_btn:
-        pdf_path = st.session_state.get('pdf_path')
-        excel_path = st.session_state.get('excel_path')
-        if st.session_state.get('images'):
-            create_pdf_report(st.session_state['images'], st.session_state['data'], pdf_path, cost_per_meter, cost_per_square_meter)
-        create_excel_report(st.session_state['data'], excel_path, cost_per_meter, cost_per_square_meter)
-        st.success("Costs updated and reports regenerated successfully!")
+    tab_dashboard, tab_editor, tab_images, tab_artifacts = st.tabs(["📊 Дашборд", "✏️ Данные", "🖼️ Предпросмотр", "⚠️ Артефакты DXF"])
 
-    # Calculate Costs for Preview
+    with tab_editor:
+        st.subheader("Редактирование данных")
+        st.write("Вы можете изменить количество деталей или названия материалов прямо в таблице. Итоговые суммы пересчитаются автоматически.")
+
+        df = pd.DataFrame(st.session_state['data'])
+
+        # We only want users to edit specific columns
+        edited_df = st.data_editor(
+            df,
+            column_config={
+                "File": st.column_config.TextColumn("Файл", disabled=True),
+                "Length": st.column_config.NumberColumn("Длина реза (мм)", disabled=True, format="%.2f"),
+                "Area": st.column_config.NumberColumn("Площадь (м²)", disabled=True, format="%.4f"),
+                "Warnings": st.column_config.TextColumn("Статус", disabled=True),
+                "Quantity": st.column_config.NumberColumn("Количество", min_value=1, step=1)
+            },
+            hide_index=True,
+            use_container_width=True,
+            key="data_editor"
+        )
+
+        # Sync back edited data to session state
+        st.session_state['data'] = edited_df.to_dict('records')
+
+    # Calculate Costs dynamically based on the (potentially edited) session state
     preview_data = []
     grand_total = 0.0
+    total_area_all = 0.0
+    total_length_all = 0.0
+
     for item in st.session_state['data']:
         cutting_cost = (item['Length'] / 1000) * cost_per_meter * item['Quantity']
         material_cost = item['Area'] * cost_per_square_meter * item['Quantity']
         total = cutting_cost + material_cost
+
         grand_total += total
+        total_area_all += item['Area'] * item['Quantity']
+        total_length_all += item['Length'] * item['Quantity']
 
         preview_item = item.copy()
         preview_item['Cutting Cost'] = round(cutting_cost, 2)
@@ -141,44 +168,81 @@ if st.session_state.get('reports_generated'):
         preview_item['Total'] = round(total, 2)
         preview_data.append(preview_item)
 
-    # Display Preview
-    st.subheader("Preview Data")
-    df_preview = pd.DataFrame(preview_data)
-    st.dataframe(df_preview, use_container_width=True)
-    st.write(f"**Grand Total Cost:** {grand_total:.2f}")
+    # If the user updated the cost multipliers or table data, regenerate reports
+    if recalculate_btn:
+        pdf_path = st.session_state.get('pdf_path')
+        excel_path = st.session_state.get('excel_path')
+        if st.session_state.get('images'):
+            create_pdf_report(st.session_state['images'], st.session_state['data'], pdf_path, cost_per_meter, cost_per_square_meter)
+        create_excel_report(st.session_state['data'], excel_path, cost_per_meter, cost_per_square_meter)
+        st.success("Отчеты успешно обновлены!")
 
-    # Download buttons
-    col1, col2 = st.columns(2)
+    with tab_dashboard:
+        st.subheader("Сводка по проекту")
 
-    pdf_path = st.session_state.get('pdf_path', '')
-    if os.path.exists(pdf_path):
-        with open(pdf_path, "rb") as f:
-            col1.download_button(
-                label="Download PDF Report",
-                data=f,
-                file_name="dxf_report.pdf",
-                mime="application/pdf"
-            )
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Общая стоимость", f"{grand_total:,.2f} ₽")
+        col2.metric("Общая площадь материала", f"{total_area_all:,.2f} м²")
+        col3.metric("Общая длина реза", f"{total_length_all / 1000:,.2f} м")
 
-    excel_path = st.session_state.get('excel_path', '')
-    if os.path.exists(excel_path):
-        with open(excel_path, "rb") as f:
-            col2.download_button(
-                label="Download Excel Report",
-                data=f,
-                file_name="dxf_report.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+        st.markdown("---")
 
-    # Show Images
-    st.subheader("Generated Previews")
-    images = st.session_state.get('images', [])
-    cols = st.columns(min(3, len(images))) if images else []
-    for i, img_info in enumerate(images):
-        with cols[i % len(cols)]:
-            st.image(img_info['image_path'], caption=img_info['filename'])
+        if preview_data:
+            chart_df = pd.DataFrame(preview_data)
+            chart_df = chart_df[['File', 'Cutting Cost', 'Material Cost']]
+            chart_df = chart_df.set_index('File')
 
-    if st.button("Clear Results"):
+            st.write("**Структура стоимости по деталям**")
+            st.bar_chart(chart_df)
+
+        st.markdown("### Скачать отчеты")
+        col_dl1, col_dl2 = st.columns(2)
+
+        pdf_path = st.session_state.get('pdf_path', '')
+        if os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as f:
+                col_dl1.download_button(
+                    label="📥 Скачать PDF Отчет",
+                    data=f,
+                    file_name="dxf_report.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+
+        excel_path = st.session_state.get('excel_path', '')
+        if os.path.exists(excel_path):
+            with open(excel_path, "rb") as f:
+                col_dl2.download_button(
+                    label="📥 Скачать Excel Отчет",
+                    data=f,
+                    file_name="dxf_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+
+    with tab_images:
+        st.subheader("Предпросмотр контуров")
+        images = st.session_state.get('images', [])
+        cols = st.columns(min(3, max(1, len(images)))) if images else []
+        for i, img_info in enumerate(images):
+            with cols[i % len(cols)]:
+                st.image(img_info['image_path'], caption=img_info['filename'])
+
+    with tab_artifacts:
+        st.subheader("Анализ качества DXF (Артефакты)")
+        st.write("Проверка на микро-сегменты и незамкнутые контуры.")
+
+        artifact_found = False
+        for item in st.session_state['data']:
+            if item.get('Warnings', 'OK') != 'OK':
+                artifact_found = True
+                st.error(f"**{item['File']}**:\n{item['Warnings']}")
+
+        if not artifact_found:
+            st.success("Все загруженные DXF файлы не содержат критических артефактов (микро-сегментов и разрывов контура).")
+
+    st.markdown("---")
+    if st.button("Очистить результаты", type="primary"):
         # Explicitly clean up temp dir on clear
         temp_dir = st.session_state.get('temp_dir')
         if temp_dir and os.path.exists(temp_dir):

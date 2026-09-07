@@ -155,6 +155,57 @@ def calculate_precise_area(doc):
 
     return total_area / 1_000_000  # Convert mm^2 to m^2
 
+def analyze_dxf_artifacts(doc, min_length=0.1):
+    """
+    Analyzes the DXF document for potential artifacts like micro-segments
+    and unclosed contours which might cause issues during cutting.
+    """
+    msp = doc.modelspace()
+    micro_segments = 0
+    lines = []
+
+    for entity in msp:
+        try:
+            # 1. Check for micro-segments
+            length = 0.0
+            if entity.dxftype() == 'LINE':
+                length = calculate_line_length(entity)
+            elif entity.dxftype() in ['LWPOLYLINE', 'POLYLINE']:
+                length = calculate_polyline_length(entity)
+            elif entity.dxftype() == 'CIRCLE':
+                length = calculate_circle_length(entity)
+            elif entity.dxftype() == 'ARC':
+                length = calculate_arc_length(entity)
+            elif entity.dxftype() == 'SPLINE':
+                length = calculate_spline_length(entity)
+
+            if 0 < length < min_length:
+                micro_segments += 1
+
+            # 2. Collect lines for unclosed contour analysis
+            vertices = get_entity_vertices(entity)
+            if len(vertices) >= 2:
+                lines.append(LineString(vertices))
+        except Exception:
+            continue
+
+    unclosed_contours = 0
+    if lines:
+        merged = linemerge(lines)
+        geoms = merged.geoms if hasattr(merged, 'geoms') else [merged]
+        for geom in geoms:
+            # If after merging it is a LineString but not a closed ring
+            if geom.geom_type == 'LineString' and not geom.is_ring:
+                unclosed_contours += 1
+
+    warnings = []
+    if micro_segments > 0:
+        warnings.append(f"Обнаружено {micro_segments} микро-сегментов (< {min_length}мм).")
+    if unclosed_contours > 0:
+        warnings.append(f"Обнаружено {unclosed_contours} незамкнутых контуров.")
+
+    return warnings
+
 def render_dxf_to_image(doc, image_path):
     try:
         # Save exact plot to image using matplotlib and ezdxf
