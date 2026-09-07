@@ -1,169 +1,63 @@
+# DXF Cost Estimator & Report Generator (Web Version)
 
-# README
+This is a comprehensive tool for processing DXF files, extracting data (total cut length and area), calculating costs based on user inputs, and generating rich PDF and Excel reports. It features a modern, responsive web interface built with **Streamlit**.
 
-## DXF Report Generator
+## Key Features
 
-DXF Report Generator is a Python application that processes DXF files in a selected directory, calculates the total length of lines, calculates the area of the parts, and generates a PDF report with images and a detailed cost table. The application includes a graphical user interface (GUI) with a dark theme, where users can input cost parameters and generate reports effortlessly.
-
-## Features
-
-- **Batch Processing**: Process multiple DXF files in a selected directory.
-- **Length and Area Calculation**: Calculate the total length of lines and the area of each part.
-- **Cost Estimation**: Calculate cutting and material costs based on user-defined parameters.
-- **PDF Report Generation**: Generate a PDF report with images of the parts and a detailed cost table.
-- **Graphical User Interface**: User-friendly GUI with a dark theme.
-- **Customizable**: Adaptable to different pricing models and units.
-
-## Table of Contents
-
-- [Installation](#installation)
-- [Usage](#usage)
-- [File Naming Convention](#file-naming-convention)
-- [Dependencies](#dependencies)
-- [Contributing](#contributing)
-- [License](#license)
+- **Modern Web Interface:** Built with Streamlit for a smooth, intuitive drag-and-drop experience.
+- **Advanced DXF Parsing:** Calculates both line/cut length and overall part area.
+- **Rich Filename Metadata:** Automatically parses file names (e.g., `bracket_steel_3mm_5.dxf`) to extract the part name, material, thickness, and quantity.
+- **Dynamic Cost Calculation:** Interactive sidebar for adjusting cutting and material costs and instantly previewing the grand total.
+- **Comprehensive Reporting:** Export your results seamlessly to **PDF** (including generated part images) and **Excel** (.xlsx).
 
 ## Installation
 
 1. **Clone the Repository**
-
    ```bash
    git clone https://github.com/yourusername/dxf-report-generator.git
    cd dxf-report-generator
    ```
 
-2. **Create a Virtual Environment (Optional but Recommended)**
-
+2. **Create and Activate a Virtual Environment (Optional but Recommended)**
    ```bash
    python -m venv venv
-   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. **Install Required Packages**
-
+3. **Install Dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-   *If `requirements.txt` is not provided, install the dependencies manually:*
-
-   ```bash
-   pip install ezdxf matplotlib reportlab
-   ```
-
-
 ## Usage
 
-1. **Run the Application**
-
+1. **Start the Web Application**
    ```bash
-   python dxf_report_generator.py
+   cd dxf_app
+   streamlit run app.py
    ```
-
-2. **Using the GUI**
-
-   - **Select Directory**: Click on the "Выбрать папку" button to select the directory containing your DXF files.
-   - **Enter Costs**:
-     - **Стоимость реза за метр**: Enter the cutting cost per meter.
-     - **Стоимость материала за м²**: Enter the material cost per square meter.
-   - **Generate Report**: Click on the "Сформировать отчет" button to start processing.
-   - **Progress Monitoring**: The progress label will display the current status of the processing.
-   - **Open Report**: Once processing is complete, the "Открыть отчет" button becomes active. Click it to open the generated PDF report.
-
-3. **Report Output**
-
-   - The PDF report (`dxf_files.pdf`) is saved in the selected directory.
-   - The report includes images of each DXF file and a table with detailed calculations.
+2. **Access the App:** Open the URL provided in your terminal (typically `http://localhost:8501`).
+3. **Upload Files:** Drag and drop your `.dxf` files into the upload area.
+4. **Configure Settings:** Set the cutting cost per meter and material cost per square meter via the sidebar.
+5. **Process & Generate:** Click the "Process Files & Generate Reports" button.
+6. **Download:** Review the calculation preview on the screen and download the generated PDF or Excel report.
 
 ## File Naming Convention
 
-For accurate quantity extraction, DXF files should be named using the following convention:
+To fully utilize the automatic metadata extraction, name your files using the following pattern:
+`name_material_thickness_quantity.dxf`
 
-```
-name_quantity.dxf
-```
+**Example:**
+`bracket_steel_3mm_5.dxf` -> Name: `bracket`, Material: `steel`, Thickness: `3mm`, Quantity: `5`
 
-- **Example**: `partA_5.dxf` indicates that there are 5 units of `partA`.
+If the file doesn't follow this strict convention, the tool will gracefully fallback to standard formats (like `name_quantity.dxf` or simply `name.dxf`).
 
-If the quantity is not specified, the program assumes a default quantity of 1.
-
-## Dependencies
-
-- **Python 3.x**
-- **ezdxf**: For reading and processing DXF files.
-- **matplotlib**: For rendering DXF files into images.
-- **ReportLab**: For generating the PDF report.
-- **tkinter**: For the GUI (usually included with Python).
-
-
-
-## Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. **Fork the Repository**
-
-   Click on the "Fork" button at the top right corner of this page.
-
-2. **Clone Your Fork**
-
-   ```bash
-   git clone https://github.com/yourusername/dxf-report-generator.git
-   ```
-
-3. **Create a New Branch**
-
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-4. **Make Your Changes**
-
-5. **Commit Your Changes**
-
-   ```bash
-   git commit -am 'Add some feature'
-   ```
-
-6. **Push to the Branch**
-
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-7. **Submit a Pull Request**
-
-   Go to the original repository and click on "Pull Request".
+## Technologies Used
+- **Streamlit**: Web interface
+- **ezdxf**: Reading and parsing DXF files
+- **matplotlib**: Rendering DXF vector data into images
+- **reportlab**: PDF report generation
+- **pandas** & **openpyxl**: Excel report generation
 
 ## License
-
-This project is licensed under the MIT License 
-
----
-
-
-
-
-**Note**: Ensure that you adjust the path to the Arial font in the `create_pdf` function if it's located in a different directory on your system.
-
-## How to Run the Script
-
-1. **Place the Script**
-
-   Save the script as `dxf_report_generator.py` in your project directory.
-
-2. **Ensure Dependencies are Installed**
-
-   ```bash
-   pip install ezdxf matplotlib reportlab
-   ```
-
-3. **Run the Script**
-
-   ```bash
-   python dxf_report_generator.py
-   ```
-
----
-
-If you have any questions or need further assistance, feel free to open an issue or submit a pull request.
+MIT License
